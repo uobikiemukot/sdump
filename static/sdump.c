@@ -861,8 +861,10 @@ char *make_temp_file(char *template)
 	if (atexit(remove_temp_file) != 0)
 		logging(ERROR, "atexit() failed\nmaybe temporary file remains...\n");
 
+	/*
 	if (fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK) == -1)
 		logging(ERROR, "couldn't set O_NONBLOCK flag\n");
+	*/
 
 	while ((size = read(STDIN_FILENO, buf, BUFSIZE)) > 0) {
 		write(fd, buf, size);
