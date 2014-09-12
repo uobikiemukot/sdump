@@ -2,6 +2,26 @@
 
 sixel image dumper
 
+## install
+
+you need to install following library before build
+
+-	libsixel (https://github.com/saitoha/libsixel),
+-	libpng
+-	libjpeg or libjpeg-turbo
+
+then just type "make"
+
+## install (static)
+
+static link version (located in ./static) depends no extra (shared) library
+
+just type "cd static; make"
+
+-	libsixel (included in ./static/libsixel)
+-	stb_image.h (for jpeg)
+-	lodepng.h, lodepng.c (for png)
+
 ## usage
 
  $ sdump [-h] [-f] [-r angle] image
