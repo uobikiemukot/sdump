@@ -3,7 +3,6 @@
 #include "util.h"
 #include "loader.h"
 #include "image.h"
-#include "sixel.h"
 
 char temp_file[] = "/tmp/sdump.XXXXXX";
 
