@@ -1,0 +1,49 @@
+#!/bin/bash
+
+SDUMP_OPT="-f"
+FILES=($@)
+INDEX=0
+
+#echo "file num: ${#FILES[@]}"
+if test ${#FILES[@]} -le "0"; then
+	exit 0
+fi
+
+tput civis
+tput clear
+
+echo "filename:${FILES[$INDEX]}"
+sdump "$SDUMP_OPT" "${FILES[$INDEX]}" 2> /dev/null
+
+while :; do
+	read -s -n 1 KEY
+
+	#tput cr
+	#tput el
+	#tput cup 0 0
+	tput clear
+
+	case "$KEY" in
+	"j")
+		INDEX=`expr $INDEX + 1`;;
+	"J")
+		INDEX=`expr $INDEX + 10`;;
+	"k")
+		INDEX=`expr $INDEX - 1`;;
+	"K")
+		INDEX=`expr $INDEX - 10`;;
+	"q")
+		tput cnorm
+		exit 0;;
+	esac
+
+	if test $INDEX -lt "0"; then
+		INDEX=`expr ${#FILES[@]} - 1`
+	elif test $INDEX -ge "${#FILES[@]}"; then
+		INDEX=0
+	fi
+
+	#echo $INDEX
+	echo "filename:${FILES[$INDEX]}"
+	sdump "$SDUMP_OPT" "${FILES[$INDEX]}" 2> /dev/null
+done
