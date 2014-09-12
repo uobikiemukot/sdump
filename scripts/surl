@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILENAME=`mktemp --tmpdir=/tmp surl.XXXXXX`
+FILENAME=`mktemp /tmp/surl.XXXXXX`
 
 wget -q --timeout=2 -O "$FILENAME" "$1" \
 	&& sdump -f "$FILENAME" 2> /dev/null

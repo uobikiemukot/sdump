@@ -6,7 +6,7 @@ INDEX=1
 
 function mktemp_file()
 {
-	FILENAME=`mktemp --tmpdir=/tmp spdf.XXXXXX`
+	FILENAME=`mktemp /tmp/spdf.XXXXXX`
 	mudraw -o $FILENAME -F png $1 $2 2> /dev/null
 	echo $FILENAME
 }
