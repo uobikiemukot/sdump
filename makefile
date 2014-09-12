@@ -1,9 +1,10 @@
-CC      = gcc
+CC ?= gcc
+#CC ?= clang
 
-CFLAGS  = -Wall -Wextra -std=c99 -pedantic \
--march=native -Ofast -flto -pipe -s
+CFLAGS  ?= -Wall -Wextra -std=c99 -pedantic \
+-O3 -pipe -s
 #-Og -g -rdynamic #-pg
-LDFLAGS = -ljpeg -lpng -lsixel
+LDFLAGS ?= -ljpeg -lpng -lsixel
 
 HDR = stb_image.h libnsgif.h libnsbmp.h \
 	sdump.h util.h loader.h image.h 
