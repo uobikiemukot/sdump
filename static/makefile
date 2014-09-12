@@ -20,7 +20,7 @@ all: $(DST)
 sdump: sdump.c $(HDR) $(SRC) $(SIXEL_SRC)
 	# recommend to copy "conf.h" from libsixel to ./libsixel (after ./configure)
 	$(CC) -c -O3 $(SIXEL_SRC)
-	$(CC) $(CFLAGS) $(LDFLAGS) -I../libsixel \
+	$(CC) $(CFLAGS) $(LDFLAGS) -I./libsixel \
 		$(SIXEL_OBJ) $(SRC) $< -o $@
 	rm *.o
 
