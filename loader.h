@@ -142,7 +142,7 @@ void my_png_error(png_structp png_ptr, png_const_charp error_msg)
 {
 	logging(ERROR, "libpng: %s\n", error_msg);
 	if (png_ptr)
-		png_longjmp(png_ptr, 1);
+		longjmp(png_jmpbuf(png_ptr), 1);
 }
 
 void my_png_warning(png_structp png_ptr, png_const_charp warning_msg)
