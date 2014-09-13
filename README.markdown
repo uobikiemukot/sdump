@@ -2,11 +2,13 @@
 
 sixel image dumper
 
+this program is a variant of [idump](https://github.com/uobikiemukot/idump)
+
 ## install
 
 you need to install following library before build
 
--	libsixel (https://github.com/saitoha/libsixel),
+-	libsixel (https://github.com/saitoha/libsixel)
 -	libpng
 -	libjpeg or libjpeg-turbo
 
