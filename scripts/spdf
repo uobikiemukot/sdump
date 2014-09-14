@@ -1,32 +1,19 @@
 #!/bin/bash
 
 SDUMP_OPT="-f"
+MUDRAW_OPT="-o /dev/stdout -F png"
 FILE=$1
-INDEX=1
-
-function mktemp_file()
-{
-	FILENAME=`mktemp ${TMPDIR:-/tmp}/spdf.XXXXXX`
-	mudraw -o $FILENAME -F png $1 $2 2> /dev/null
-	echo $FILENAME
-}
+INDEX=1 # page origin:1
 
 tput civis
 tput clear
 
 echo "filename:$FILE page:$INDEX"
-PDF_IMAGE=`mktemp_file $FILE $INDEX`
-if test -f $PDF_IMAGE; then
-	sdump "$SDUMP_OPT" "$PDF_IMAGE" 2> /dev/null
-	rm $PDF_IMAGE
-fi
+mudraw $MUDRAW_OPT $FILE $INDEX 2> /dev/null | sdump $SDUMP_OPT 2> /dev/null
 
 while :; do
 	read -s -n 1 KEY
 
-	#tput cr
-	#tput el
-	#tput cup 0 0
 	tput clear
 
 	case "$KEY" in
@@ -47,11 +34,6 @@ while :; do
 		INDEX=1
 	fi
 
-	#echo $INDEX
 	echo "filename:$FILE page:$INDEX"
-	PDF_IMAGE=`mktemp_file $FILE $INDEX`
-	if test -f $PDF_IMAGE; then
-		sdump "$SDUMP_OPT" "$PDF_IMAGE" 2> /dev/null
-		rm $PDF_IMAGE
-	fi
+	mudraw $MUDRAW_OPT $FILE $INDEX 2> /dev/null | sdump $SDUMP_OPT 2> /dev/null
 done

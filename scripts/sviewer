@@ -9,19 +9,17 @@ if test ${#FILES[@]} -le "0"; then
 	exit 0
 fi
 
-tput civis
-tput clear
+tput civis # set cursor hidden
+tput clear # clear screen and move to (0, 0)
 
 echo "filename:${FILES[$INDEX]}"
+#echo -ne "\ekfilename:${FILES[$INDEX]}\e\\" # xterm like title change
 sdump "$SDUMP_OPT" "${FILES[$INDEX]}" 2> /dev/null
 
 while :; do
 	read -s -n 1 KEY
 
-	#tput cr
-	#tput el
-	#tput cup 0 0
-	tput clear
+	tput clear # clear screen and move to (0, 0)
 
 	case "$KEY" in
 	"j")
@@ -33,7 +31,7 @@ while :; do
 	"K")
 		INDEX=`expr $INDEX - 10`;;
 	"q")
-		tput cnorm
+		tput cnorm # set cursor visible
 		exit 0;;
 	esac
 
@@ -43,7 +41,7 @@ while :; do
 		INDEX=0
 	fi
 
-	#echo $INDEX
 	echo "filename:${FILES[$INDEX]}"
+	#echo -ne "\ekfilename:${FILES[$INDEX]}\e\\" # xterm like title change
 	sdump "$SDUMP_OPT" "${FILES[$INDEX]}" 2> /dev/null
 done

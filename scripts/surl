@@ -1,8 +1,6 @@
 #!/bin/bash
 
-FILENAME=`mktemp ${TMPDIR:-/tmp}/surl.XXXXXX`
+SDUMP_OPT="-f"
+WGET_OPT="-q -O -"
 
-wget -q --timeout=2 -O "$FILENAME" "$1" \
-	&& sdump -f "$FILENAME" 2> /dev/null
-
-rm -f "$FILENAME"
+wget $WGET_OPT $1 | sdump $SDUMP_OPT 2> /dev/null
