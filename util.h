@@ -1,58 +1,15 @@
 /* See LICENSE for licence details. */
 /* error functions */
-/*
-void logging(ERROR, char *format, ...)
-{
-	va_list arg;
-	FILE *outfp;
-
-	outfp = (logfp == NULL) ? stderr: logfp;
-	fprintf(outfp, ">>ERROR<<\t");
-	va_start(arg, format);
-	vfprintf(outfp, format, arg);
-	va_end(arg);
-}
-
-void warn(char *format, ...)
-{
-	va_list arg;
-	FILE *outfp;
-
-	outfp = (logfp == NULL) ? stderr: logfp;
-	fprintf(outfp, ">>WARN<<\t");
-	va_start(arg, format);
-	vfprintf(outfp, format, arg);
-	va_end(arg);
-}
-
-void debug(char *format, ...)
-{
-	va_list arg;
-	FILE *outfp;
-
-	if (!VERBOSE)
-		return;
-
-	outfp = (logfp == NULL) ? stderr: logfp;
-	fprintf(outfp, ">>DEBUG<<\t");
-	va_start(arg, format);
-	vfprintf(outfp, format, arg);
-	va_end(arg);
-}
-*/
-
-enum loglevel {
+enum loglevel_t {
 	DEBUG = 0,
 	WARN,
 	ERROR,
 	FATAL,
 };
 
-void logging(int loglevel, char *format, ...)
+void logging(enum loglevel_t loglevel, char *format, ...)
 {
 	va_list arg;
-	//FILE *outfp;
-
 	static const char *loglevel2str[] = {
 		[DEBUG] = "DEBUG",
 		[WARN]  = "WARN",
@@ -63,21 +20,11 @@ void logging(int loglevel, char *format, ...)
 	if (loglevel == DEBUG && !VERBOSE)
 		return;
 
-	//outfp = (logfp == NULL) ? stderr: logfp;
-
 	fprintf(stderr, ">>%s<<\t", loglevel2str[loglevel]);
 	va_start(arg, format);
 	vfprintf(stderr, format, arg);
 	va_end(arg);
 }
-
-/*
-void fatal(char *str)
-{
-	fprintf(stderr, "%s\n", str);
-	exit(EXIT_FAILURE);
-}
-*/
 
 /* wrapper of C functions */
 int eopen(const char *path, int flag)
@@ -86,7 +33,7 @@ int eopen(const char *path, int flag)
 	errno = 0;
 
 	if ((fd = open(path, flag)) < 0) {
-		logging(ERROR, "cannot open \"%s\"\n", path);
+		logging(ERROR, "couldn't open \"%s\"\n", path);
 		logging(ERROR, "open: %s\n", strerror(errno));
 	}
 	return fd;
@@ -109,7 +56,7 @@ FILE *efopen(const char *path, char *mode)
 	errno = 0;
 
 	if ((fp = fopen(path, mode)) == NULL) {
-		logging(ERROR, "cannot open \"%s\"\n", path);
+		logging(ERROR, "couldn't open \"%s\"\n", path);
 		logging(ERROR, "fopen: %s\n", strerror(errno));
 	}
 	return fp;
@@ -173,7 +120,6 @@ long int estrtol(const char *nptr, char **endptr, int base)
 	return ret;
 }
 
-/*
 int estat(const char *restrict path, struct stat *restrict buf)
 {
 	int ret;
@@ -184,7 +130,19 @@ int estat(const char *restrict path, struct stat *restrict buf)
 
 	return ret;
 }
-*/
+
+int emkstemp(char *template)
+{
+	int ret;
+	errno = 0;
+
+	if ((ret = mkstemp(template)) < 0) {
+		logging(ERROR, "couldn't open \"%s\"\n", template);
+		logging(ERROR, "mkstemp: %s\n", strerror(errno));
+	}
+
+	return ret;
+}
 
 /* some useful functions */
 int str2num(char *str)
