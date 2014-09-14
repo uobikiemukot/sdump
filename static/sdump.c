@@ -51,6 +51,18 @@ void logging(int loglevel, char *format, ...)
 }
 
 /* wrapper of C functions */
+int eopen(const char *path, int flag)
+{
+	int fd;
+	errno = 0;
+
+	if ((fd = open(path, flag)) < 0) {
+		logging(ERROR, "couldn't open \"%s\"\n", path);
+		logging(ERROR, "open: %s\n", strerror(errno));
+	}
+	return fd;
+}
+
 int eclose(int fd)
 {
 	int ret = 0;
@@ -110,6 +122,19 @@ long int estrtol(const char *nptr, char **endptr, int base)
 	return ret;
 }
 
+int emkstemp(char *template)
+{
+	int ret;
+	errno = 0;
+
+	if ((ret = mkstemp(template)) < 0) {
+		logging(ERROR, "couldn't open \"%s\"\n", template);
+		logging(ERROR, "mkstemp: %s\n", strerror(errno));
+	}
+
+	return ret;
+}
+
 /* some useful functions */
 int str2num(char *str)
 {
@@ -120,7 +145,6 @@ int str2num(char *str)
 }
 
 /* image loading functions */
-
 /* for png */
 #include "../lodepng.h"
 
@@ -820,7 +844,7 @@ void normalize_bpp(struct image *img, int bytes_per_pixel, bool normalize_all)
 /* main functions */
 #include "sixel.h"
 
-char temp_file[] = "/tmp/sdump.XXXXXX";
+char temp_file[BUFSIZE];
 
 enum {
 	SIXEL_COLORS = 256,
@@ -831,41 +855,53 @@ enum {
 
 void usage()
 {
-	printf("idump [-h] [-f] [-r angle] image\n"
-		"-h: show this help\n"
-		"-f: fit image to display\n"
-		"-r: rotate image (90/180/270)\n"
+	printf("usage:\n"
+		"\tsdump [-h] [-f] [-r angle] image\n"
+		"\tcat image | sdump\n"
+		"\twget -O - image_url | sdump\n"
+		"options:\n"
+		"\t-h: show this help\n"
+		"\t-f: fit image to display\n"
+		"\t-r: rotate image (90/180/270)\n"
 		);
 }
 
 void remove_temp_file()
 {
-	extern char temp_file[]; /* global */
+	extern char temp_file[BUFSIZE]; /* global */
 	remove(temp_file);
 }
 
-char *make_temp_file(char *template)
+char *make_temp_file(const char *template)
 {
+	extern char temp_file[BUFSIZE]; /* global */
 	int fd;
 	ssize_t size, file_size = 0;
-	char buf[BUFSIZE];
-	errno = 0;
+	char buf[BUFSIZE], *env;
 
-	if ((fd = mkstemp(template)) < 0) {
-		perror("mkstemp");
+	/* stdin is tty or not */
+	if (isatty(STDIN_FILENO)) {
+		logging(ERROR, "stdin is neither pipe nor redirect\n");
 		return NULL;
 	}
-	logging(DEBUG, "tmp file:%s\n", template);
+
+	/* prepare temp file */
+	memset(temp_file, 0, BUFSIZE);
+	if ((env = getenv("TMPDIR")) != NULL) {
+		snprintf(temp_file, BUFSIZE, "%s/%s", env, template);
+	} else {
+		snprintf(temp_file, BUFSIZE, "/tmp/%s", template);
+	}
+
+	if ((fd = emkstemp(temp_file)) < 0)
+		return NULL;
+	logging(DEBUG, "tmp file:%s\n", temp_file);
 
 	/* register cleanup function */
-	if (atexit(remove_temp_file) != 0)
+	if (atexit(remove_temp_file))
 		logging(ERROR, "atexit() failed\nmaybe temporary file remains...\n");
 
-	/*
-	if (fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK) == -1)
-		logging(ERROR, "couldn't set O_NONBLOCK flag\n");
-	*/
-
+	/* read data */
 	while ((size = read(STDIN_FILENO, buf, BUFSIZE)) > 0) {
 		write(fd, buf, size);
 		file_size += size;
@@ -874,11 +910,10 @@ char *make_temp_file(char *template)
 
 	if (file_size == 0) {
 		logging(ERROR, "stdin is empty\n");
-		usage();
 		return NULL;
 	}
 
-	return template;
+	return temp_file;
 }
 
 int sixel_write_callback(char *data, int size, void *priv)
@@ -902,9 +937,18 @@ int sixel_write_callback(char *data, int size, void *priv)
 	return fwrite(data, size, 1, (FILE *) priv);
 }
 
+void cleanup(sixel_dither_t *sixel_dither, sixel_output_t *sixel_context, struct image *img)
+{
+	if (sixel_dither)
+		sixel_dither_unref(sixel_dither);
+	if (sixel_context)
+		sixel_output_unref(sixel_context);
+	free_image(img);
+}
+
 int main(int argc, char **argv)
 {
-	extern char temp_file[]; /* global */
+	const char *template = "sdump.XXXXXX";
 	char *file;
 	bool resize = false;
 	int angle = 0, opt;
@@ -933,18 +977,21 @@ int main(int argc, char **argv)
 	if (optind < argc)
 		file = argv[optind];
 	else
-		file = make_temp_file(temp_file);
+		file = make_temp_file(template);
 
 	if (file == NULL) {
 		logging(FATAL, "input file not found\n");
+		usage();
 		return EXIT_FAILURE;
 	}
 
 	/* init */
 	init_image(&img);
 
-	if (load_image(file, &img) == false)
-		goto cleanup;
+	if (load_image(file, &img) == false) {
+		logging(FATAL, "couldn't load image\n");
+		return EXIT_FAILURE;
+	}
 
 	/* rotate/resize and draw */
 	/* TODO: support color reduction for 8bpp mode */
@@ -962,7 +1009,7 @@ int main(int argc, char **argv)
 
 	if ((sixel_dither = sixel_dither_create(SIXEL_COLORS)) == NULL) {
 		logging(ERROR, "couldn't create dither\n");
-		goto cleanup;
+		goto error_occured;
 	}
 
 	/* XXX: use first frame for dither initialize */
@@ -970,20 +1017,18 @@ int main(int argc, char **argv)
 		SIXEL_BPP, LARGE_AUTO, REP_AUTO, QUALITY_AUTO) != 0) {
 		logging(ERROR, "couldn't initialize dither\n");
 		sixel_dither_unref(sixel_dither);
-		goto cleanup;
+		goto error_occured;
 	}
 	sixel_dither_set_diffusion_type(sixel_dither, DIFFUSE_AUTO);
 
 	if ((sixel_context = sixel_output_create(sixel_write_callback, stdout)) == NULL) {
 		logging(ERROR, "couldn't create sixel context\n");
-		goto cleanup;
+		goto error_occured;
 	}
 	sixel_output_set_8bit_availability(sixel_context, CSIZE_7BIT);
 
-	//printf("\033[s"); /* save cursor position (SCO) */
 	printf("\0337"); /* save cursor position */
 	for (int i = 0; i < get_frame_count(&img); i++) {
-		//printf("\033[u"); /* restore cursor position (SCO) */
 		printf("\0338"); /* restore cursor position */
 		sixel_encode(get_current_frame(&img), get_image_width(&img), get_image_height(&img), get_image_channel(&img), sixel_dither, sixel_context);
 		usleep(get_current_delay(&img) * 10000); /* gif delay 1 == 1/100 sec */
@@ -991,12 +1036,10 @@ int main(int argc, char **argv)
 	}
 
 	/* cleanup resource */
-cleanup:
-	if (sixel_dither)
-		sixel_dither_unref(sixel_dither);
-	if (sixel_context)
-		sixel_output_unref(sixel_context);
-	free_image(&img);
-
+	cleanup(sixel_dither, sixel_context, &img);
 	return EXIT_SUCCESS;
+
+error_occured:
+	cleanup(sixel_dither, sixel_context, &img);
+	return EXIT_FAILURE;;
 }
