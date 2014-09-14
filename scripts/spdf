@@ -1,9 +1,11 @@
 #!/bin/bash
 
+FILE=$1
 SDUMP_OPT="-f"
 MUDRAW_OPT="-o /dev/stdout -F png"
-FILE=$1
+
 INDEX=1 # page origin:1
+PAGES=`mutool info $FILE | grep "^Pages:" | cut -d" " -f2 `
 
 tput civis
 tput clear
@@ -25,12 +27,18 @@ while :; do
 		INDEX=`expr $INDEX - 1`;;
 	"K")
 		INDEX=`expr $INDEX - 10`;;
+	"g")
+		INDEX=1;;
+	"G")
+		INDEX=$PAGES;;
 	"q")
 		tput cnorm
 		exit 0;;
 	esac
 
 	if test $INDEX -lt "1"; then
+		INDEX=$PAGES
+	elif test $INDEX -gt $PAGES; then
 		INDEX=1
 	fi
 
