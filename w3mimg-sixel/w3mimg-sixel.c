@@ -1,5 +1,5 @@
 /* See LICENSE for licence details. */
-#include "w3mimg_sixel.h"
+#include "w3mimg-sixel.h"
 #include "../util.h"
 #include "../loader.h"
 #include "../image.h"
