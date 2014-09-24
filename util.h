@@ -1,5 +1,9 @@
 /* See LICENSE for licence details. */
 /* error functions */
+enum {
+	VERBOSE = true, /* if false, suppress "DEBUG" level logging */
+};
+
 enum loglevel_t {
 	DEBUG = 0,
 	WARN,
@@ -73,28 +77,6 @@ int efclose(FILE *fp)
 	return ret;
 }
 
-void *emmap(void *addr, size_t len, int prot, int flag, int fd, off_t offset)
-{
-	uint32_t *fp;
-	errno = 0;
-
-	if ((fp = (uint32_t *) mmap(addr, len, prot, flag, fd, offset)) == MAP_FAILED)
-		logging(ERROR, "mmap: %s\n", strerror(errno));
-
-	return fp;
-}
-
-int emunmap(void *ptr, size_t len)
-{
-	int ret;
-	errno = 0;
-
-	if ((ret = munmap(ptr, len)) < 0)
-		logging(ERROR, "munmap: %s\n", strerror(errno));
-
-	return ret;
-}
-
 void *ecalloc(size_t nmemb, size_t size)
 {
 	void *ptr;
@@ -120,17 +102,6 @@ long int estrtol(const char *nptr, char **endptr, int base)
 	return ret;
 }
 
-int estat(const char *restrict path, struct stat *restrict buf)
-{
-	int ret;
-	errno = 0;
-
-	if ((ret = stat(path, buf)) < 0)
-		logging(ERROR, "stat: %s\n", strerror(errno));
-
-	return ret;
-}
-
 int emkstemp(char *template)
 {
 	int ret;
@@ -144,6 +115,71 @@ int emkstemp(char *template)
 	return ret;
 }
 
+int eselect(int max_fd, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *tv)
+{
+	int ret;
+	errno = 0;
+
+	if ((ret = select(max_fd, readfds, writefds, errorfds, tv)) < 0) {
+		if (errno == EINTR)
+			return eselect(max_fd, readfds, writefds, errorfds, tv);
+		else
+			logging(ERROR, "select: %s\n", strerror(errno));
+	}
+	return ret;
+}
+
+ssize_t ewrite(int fd, const void *buf, size_t size)
+{
+	ssize_t ret;
+	errno = 0;
+
+	if ((ret = write(fd, buf, size)) < 0) {
+		if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+			return ewrite(fd, buf, size);
+		else
+			logging(ERROR, "write: %s\n", strerror(errno));
+	} else if (ret < (ssize_t) size) {
+		return ret + ewrite(fd, (char *) buf + ret, size - ret);
+	}
+	return ret;
+}
+
+/*
+int estat(const char *restrict path, struct stat *restrict buf)
+{
+	int ret;
+	errno = 0;
+
+	if ((ret = stat(path, buf)) < 0)
+		logging(ERROR, "stat: %s\n", strerror(errno));
+
+	return ret;
+}
+
+void *emmap(void *addr, size_t len, int prot, int flag, int fd, off_t offset)
+{
+	uint32_t *fp;
+	errno = 0;
+
+	if ((fp = (uint32_t *) mmap(addr, len, prot, flag, fd, offset)) == MAP_FAILED)
+		logging(ERROR, "mmap: %s\n", strerror(errno));
+
+	return fp;
+}
+
+int emunmap(void *ptr, size_t len)
+{
+	int ret;
+	errno = 0;
+
+	if ((ret = munmap(ptr, len)) < 0)
+		logging(ERROR, "munmap: %s\n", strerror(errno));
+
+	return ret;
+}
+*/
+
 /* some useful functions */
 int str2num(char *str)
 {
@@ -153,6 +189,7 @@ int str2num(char *str)
 	return estrtol(str, NULL, 10);
 }
 
+/*
 static inline void swapint(int *a, int *b)
 {
 	int tmp = *a;
@@ -178,3 +215,4 @@ static inline uint32_t bit_reverse(uint32_t val, int bits)
 
 	return ret <<= shift;
 }
+*/
