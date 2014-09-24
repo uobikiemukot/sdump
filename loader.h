@@ -42,7 +42,9 @@ struct image {
 	int delay[MAX_FRAME_NUM];
 	int frame_count; /* normally 1 */
 	int loop_count;
-	int current_frame; /* for yaimgfb */
+	/* for yaimgfb */
+	int current_frame;
+	bool already_draw;
 };
 
 /* libjpeg functions */
@@ -159,12 +161,9 @@ bool load_png(FILE *fp, struct image *img)
 	png_structp png_ptr;
 	png_infop info_ptr;
 
-	fread(header, 1, PNG_HEADER_SIZE, fp);
-
-	if (png_sig_cmp(header, 0, PNG_HEADER_SIZE))
-		return false;
-
-	if ((png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, my_png_error, my_png_warning)) == NULL)
+	if (fread(header, 1, PNG_HEADER_SIZE, fp) != PNG_HEADER_SIZE
+		|| png_sig_cmp(header, 0, PNG_HEADER_SIZE)
+		|| (png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, my_png_error, my_png_warning)) == NULL)
 		return false;
 
 	if ((info_ptr = png_create_info_struct(png_ptr)) == NULL) {
@@ -492,6 +491,7 @@ void init_image(struct image *img)
 	img->frame_count   = 1;
 	img->loop_count    = 0;
 	img->current_frame = 0;
+	img->already_draw  = false;
 }
 
 void free_image(struct image *img)
