@@ -1,6 +1,10 @@
 /* See LICENSE for licence details. */
 /* this header file depends loader.h */
 
+enum {
+	MULTIPLER = 1024, /* value for avoid to use float */
+};
+
 /* inline functions:
 	never access member of struct image directly */
 static inline int get_frame_count(struct image *img)
