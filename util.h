@@ -145,6 +145,17 @@ ssize_t ewrite(int fd, const void *buf, size_t size)
 	return ret;
 }
 
+int esigaction(int signo, struct sigaction *act, struct sigaction *oact)
+{
+	int ret;
+	errno = 0;
+
+	if ((ret = sigaction(signo, act, oact)) < 0)
+		logging(ERROR, "sigaction: %s\n", strerror(errno));
+
+	return ret;
+}
+
 /*
 int estat(const char *restrict path, struct stat *restrict buf)
 {
