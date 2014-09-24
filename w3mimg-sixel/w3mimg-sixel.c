@@ -70,7 +70,7 @@ void draw_sixel_image(struct tty_t *tty, struct sixel_t *sixel, struct image *im
 
 	if (op == W3M_DRAW) {
 		logging(DEBUG, "create new sixel file\n");
-		img->already_drawed = false;
+		img->already_draw = false;
 
 		if ((fp = efopen(sixel_file, "w")) == NULL) {
 			logging(DEBUG, "couldn't open new sixel file\n");
@@ -80,9 +80,9 @@ void draw_sixel_image(struct tty_t *tty, struct sixel_t *sixel, struct image *im
 		sixel_output(sixel, img);
 		sixel_die(sixel);
 		efclose(fp);
-	} else if (op == W3M_REDRAW && !img->already_drawed) {
+	} else if (op == W3M_REDRAW && !img->already_draw) {
 		logging(DEBUG, "cat sixel file\n");
-		img->already_drawed = true;
+		img->already_draw = true;
 
 		if ((fd = eopen(sixel_file, O_RDONLY)) < 0) {
 			logging(DEBUG, "sixel file not found\n");
@@ -198,7 +198,7 @@ void w3m_clear(struct image img[], struct parm_t *parm)
 	logging(DEBUG, "w3m_clear()\n");
 
 	for (int i = 0; i < MAX_IMAGE; i++)
-		img[i].already_drawed = false;
+		img[i].already_draw = false;
 	/*
 	int offset_x, offset_y, width, height;
 
