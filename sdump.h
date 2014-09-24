@@ -14,6 +14,8 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/select.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sixel.h>
 
