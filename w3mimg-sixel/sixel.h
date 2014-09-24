@@ -9,7 +9,6 @@ enum {
 struct sixel_t {
 	sixel_output_t *context;
 	sixel_dither_t *dither;
-	FILE *output;
 };
 
 int sixel_write_callback(char *data, int size, void *priv)
