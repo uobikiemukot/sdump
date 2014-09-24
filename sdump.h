@@ -17,8 +17,10 @@
 #include <unistd.h>
 #include <sixel.h>
 
+/*
 enum {
 	VERBOSE   = false,
 	BUFSIZE   = 1024,
 	MULTIPLER = 1024,
 };
+*/
