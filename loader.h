@@ -42,9 +42,9 @@ struct image {
 	int delay[MAX_FRAME_NUM];
 	int frame_count; /* normally 1 */
 	int loop_count;
-	/* for yaimgfb */
+	/* for w3mimg */
 	int current_frame;
-	bool already_draw;
+	bool already_drew;
 };
 
 /* libjpeg functions */
@@ -491,7 +491,7 @@ void init_image(struct image *img)
 	img->frame_count   = 1;
 	img->loop_count    = 0;
 	img->current_frame = 0;
-	img->already_draw  = false;
+	img->already_drew  = false;
 }
 
 void free_image(struct image *img)
