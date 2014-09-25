@@ -13,26 +13,22 @@ struct sixel_t {
 
 int sixel_write_callback(char *data, int size, void *priv)
 {
-	/*
-	for (int i = 0; i < size; i++) {
-		if (i == (size - 1))
-			break;
+	struct tty_t *tty = (struct tty_t *) priv;
+	char *ptr;
+	ssize_t wsize, left;
 
-		if (*(data + i) == 0x1B && *(data + i + 1) == 0x5C) {
-			fprintf((FILE *) priv, "\033\033\\\033P\\");
-			break;
-		} else {
-			fwrite(data + i, 1, 1, fp);
-		}
+	ptr  = data;
+	left = size;
+	while (ptr < (data + size)) {
+		wsize = ewrite(tty->fd, ptr, size);
+		ptr  += wsize;
+		left -= wsize;
 	}
 
-	logging(DEBUG, "write callback() size:%d\n", size);
-	return size;
-	*/
-	return fwrite(data, size, 1, (FILE *) priv);
+	return true;
 }
 
-bool sixel_init(struct sixel_t *sixel, struct image *img, FILE *fp)
+bool sixel_init(struct sixel_t *sixel, struct image *img, struct tty_t *tty)
 {
 	/* XXX: libsixel only allows 3 bytes per pixel image,
 		we should convert bpp when bpp is 1 or 2 or 4 */
@@ -54,7 +50,7 @@ bool sixel_init(struct sixel_t *sixel, struct image *img, FILE *fp)
 	}
 	sixel_dither_set_diffusion_type(sixel->dither, DIFFUSE_AUTO);
 
-	if ((sixel->context = sixel_output_create(sixel_write_callback, fp)) == NULL) {
+	if ((sixel->context = sixel_output_create(sixel_write_callback, (void *) tty)) == NULL) {
 		logging(ERROR, "couldn't create sixel context\n");
 		return false;
 	}
@@ -70,13 +66,4 @@ void sixel_die(struct sixel_t *sixel)
 
 	if (sixel->context)
 		sixel_output_unref(sixel->context);
-}
-
-void sixel_output(struct sixel_t *sixel, struct image *img)
-{
-	//printf("\0337"); /* save cursor position */
-	sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
-		get_image_channel(img), sixel->dither, sixel->context);
-	increment_frame(img);
-	//printf("\0338"); /* save cursor position */
 }
