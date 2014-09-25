@@ -147,8 +147,9 @@ void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int o
 		size = get_image_width(img) * get_image_height(img) * get_image_channel(img);
 		if ((new.data[0] = ecalloc(size, 1)) == NULL)
 			return;
-		memcpy(new.data[0], img->data[0], size);
-		new.frame_count = 1;
+		memcpy(new.data[0], get_current_frame(img), size);
+		new.frame_count   = 1;
+		new.current_frame = 0;
 
 		/* XXX: maybe need to resize at this time */
 		if (width != get_image_width(&new) || height != get_image_height(&new))
@@ -173,7 +174,7 @@ void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int o
 sixel_init_err:
 		img->already_drew = true;
 		free_image(&new);
-		//increment_frame(img);
+		increment_frame(img);
 	}
 }
 
