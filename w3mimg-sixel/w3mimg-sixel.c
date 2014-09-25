@@ -1,115 +1,110 @@
 /* See LICENSE for licence details. */
-#define _XOPEN_SOURCE 600
-#include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <sys/select.h>
-#include <termios.h>
-#include <unistd.h>
-
+#include "w3mimg-sixel.h"
 #include "../util.h"
 #include "../loader.h"
 #include "../image.h"
 #include "parsearg.h"
 #include "sixel.h"
 
-enum w3m_op {
-	W3M_DRAW = 0,
-	W3M_REDRAW,
-	W3M_STOP,
-	W3M_SYNC,
-	W3M_NOP,
-	W3M_GETSIZE,
-	W3M_CLEAR,
-	NUM_OF_W3M_FUNC,
-};
-
-enum {
-	BUFSIZE     = 1024,
-	MAX_IMAGE   = 1024,
-	/* default value */
-	CELL_WIDTH  = 8,
-	CELL_HEIGHT = 16,
-	TERM_WIDTH  = 1280,
-	TERM_HEIGHT = 1024,
-	/* for select */
-	SELECT_TIMEOUT     = 100000,  /* usec */
-	SELECT_CHECK_LIMIT = 2,
-};
-
-struct tty_t {
-	int fd;                      /* fd of current controlling terminal */
-	int width, height;           /* terminal size (by pixel) */
-	int cell_width, cell_height; /* cell_size (by pixel) */
-};
-
-const char *instance_log = "/tmp/w3mimg-sixel.instance.log";
-const char *log_file     = "/tmp/w3mimg-sixel.log";
-
-void draw_sixel_image(struct tty_t *tty, struct sixel_t *sixel, struct image *img,
-	int offset_x, int offset_y, const char *file, int op)
+uint8_t *crop_image_single(struct tty_t *tty, struct image *img, uint8_t *data,
+    int shift_x, int shift_y, int width, int height)
 {
-	char *sixel_file, buf[BUFSIZE];
-	int length, fd, size;
-	FILE *fp;
+	int offset;
+	uint8_t r, g, b, *cropped_data;
 
-	length = strlen(file) + 7; /* file + ".sixel" + '\0' */
-	if ((sixel_file = ecalloc(length, sizeof(char))) == NULL)
-		return;
+	if ((cropped_data = (uint8_t *) ecalloc(width * height, img->channel)) == NULL)
+		return NULL;
 
-	snprintf(sixel_file, length, "%s%s", file, ".sixel");
-	logging(DEBUG, "sixel_file: %s\n", sixel_file);
+	for (int y = 0; y < height; y++) {
+		if (y >= tty->height)
+			break;
 
-	if (op == W3M_DRAW) {
-		logging(DEBUG, "create new sixel file\n");
-		img->already_draw = false;
+		for (int x = 0; x < width; x++) {
+			if (x >= tty->width)
+				break;
 
-		if ((fp = efopen(sixel_file, "w")) == NULL) {
-			logging(DEBUG, "couldn't open new sixel file\n");
-			goto file_open_err;
+			get_rgb(img, data, x + shift_x, y + shift_y, &r, &g, &b);
+
+			/* update copy buffer */
+			offset = img->channel * (y * width + x);
+			*(cropped_data + offset + 0) = r;
+			*(cropped_data + offset + 1) = g;
+			*(cropped_data + offset + 2) = b;
 		}
-		sixel_init(sixel, img, fp);
-		sixel_output(sixel, img);
-		sixel_die(sixel);
-		efclose(fp);
-	} else if (op == W3M_REDRAW && !img->already_draw) {
-		logging(DEBUG, "cat sixel file\n");
-		img->already_draw = true;
-
-		if ((fd = eopen(sixel_file, O_RDONLY)) < 0) {
-			logging(DEBUG, "sixel file not found\n");
-			goto file_open_err;
-		}
-		snprintf(buf, BUFSIZE, "\033[%d;%dH",
-			(offset_y / tty->cell_height) + 1, (offset_x / tty->cell_width) + 1);
-		ewrite(tty->fd, buf, strlen(buf));
-
-		while ((size = read(fd, buf, BUFSIZE)) > 0)
-			ewrite(tty->fd, buf, size);
-		close(fd);
 	}
-file_open_err:
-	free(sixel_file);
+	free(data);
+
+	img->width  = width;
+	img->height = height;
+
+	return cropped_data;
 }
 
-void w3m_draw(struct tty_t *tty, struct sixel_t *sixel, struct image imgs[], struct parm_t *parm, int op)
+void crop_image(struct tty_t *tty, struct image *img,
+    int offset_x, int offset_y, int shift_x, int shift_y, int width, int height, bool crop_all)
+{
+	/*
+		+- screen -----------------+
+		|        ^                 |
+		|        | offset_y        |
+		|        v                 |
+		|        +- image --+      |
+		|<------>|          |      |
+		|offset_x|          |      |
+		|        |          |      |
+		|        +----------+      |
+		+--------------|-----------+
+		               |
+		               v
+		+- image ----------------------+
+		|       ^                      |
+		|       | shift_y              |
+		|       v                      |
+		|       +- view port + ^       |
+		|<----->|            | |       |
+		|shift_x|            | | height|
+		|       |            | |       |
+		|       +------------+ v       |
+		|       <-  width ->           |
+		+------------------------------+
+	*/
+	uint8_t *cropped_data;
+
+	if (shift_x + width > img->width)
+		width = img->width - shift_x;
+
+	if (shift_y + height > img->height)
+		height = img->height - shift_y;
+
+	if (offset_x + width > tty->width)
+		width = tty->width - offset_x;
+
+	if (offset_y + height > tty->height)
+		height = tty->height - offset_y;
+
+	if (crop_all) {
+		for (int i = 0; i < img->frame_count; i++) {
+			if ((cropped_data = crop_image_single(tty, img, img->data[i],
+				shift_x, shift_y, width, height)) != NULL)
+				img->data[i] = cropped_data;
+		}
+	} else {
+		if ((cropped_data = crop_image_single(tty, img, img->data[img->current_frame],
+			shift_x, shift_y, width, height)) != NULL)
+			img->data[img->current_frame] = cropped_data;
+	}
+}
+
+void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int op)
 {
 	int index, offset_x, offset_y, width, height, shift_x, shift_y, view_w, view_h;
 	char *file;
 	struct image *img;
+	struct sixel_t sixel;
 
 	logging(DEBUG, "w3m_%s()\n", (op == W3M_DRAW) ? "draw": "redraw");
 
 	if (parm->argc != 11)
-	//if (parm->argc != 11 || op == W3M_REDRAW)
 		return;
 
 	index     = str2num(parm->argv[1]) - 1; /* 1 origin */
@@ -139,24 +134,47 @@ void w3m_draw(struct tty_t *tty, struct sixel_t *sixel, struct image imgs[], str
 		}
 		if (load_image(file, img) == false)
 			return;
+
+		if (!get_current_frame(img)) {
+			logging(ERROR, "specify unloaded image? img[%d] is NULL\n", index);
+			return;
+		}
+		img->already_drew = false;
+	} else if (!img->already_drew) { /* op == W3M_REDRAW */
+		struct image new = *img;
+		long size;
+
+		size = get_image_width(img) * get_image_height(img) * get_image_channel(img);
+		if ((new.data[0] = ecalloc(size, 1)) == NULL)
+			return;
+		memcpy(new.data[0], img->data[0], size);
+		new.frame_count = 1;
+
+		/* XXX: maybe need to resize at this time */
+		if (width != get_image_width(&new) || height != get_image_height(&new))
+			resize_image(&new, width, height, false);
+
+		crop_image(tty, &new, offset_x, offset_y, shift_x, shift_y,
+			(view_w ? view_w: width), (view_h ? view_h: height), false);
+
+		/* cursor move */
+		char buf[BUFSIZE];
+		snprintf(buf, BUFSIZE, "\033[%d;%dH",
+			(offset_y / tty->cell_height) + 1,( offset_x / tty->cell_width) + 1);
+		ewrite(tty->fd, buf, strlen(buf));
+
+		/* sixel */
+		if (!sixel_init(&sixel, &new, tty))
+			goto sixel_init_err;
+		sixel_encode(get_current_frame(&new), get_image_width(&new), get_image_height(&new),
+			get_image_channel(&new), sixel.dither, sixel.context);
+		sixel_die(&sixel);
+
+sixel_init_err:
+		img->already_drew = true;
+		free_image(&new);
+		//increment_frame(img);
 	}
-
-	if (!get_current_frame(img)) {
-		logging(ERROR, "specify unloaded image? img[%d] is NULL\n", index);
-		return;
-	}
-	increment_frame(img);
-
-	/* XXX: maybe need to resize at this time */
-	if (width != get_image_width(img) || height != get_image_height(img))
-		resize_image(img, width, height, false);
-
-	/* FIXME: buggy crop */
-	//crop_image(img, offset_x, offset_y, shift_x, shift_y,
-		//(view_w ? view_w: width), (view_h ? view_h: height), false);
-
-	/* sixel */
-	draw_sixel_image(tty, sixel, img, offset_x, offset_y, file, op);
 }
 
 void w3m_stop()
@@ -175,8 +193,9 @@ void w3m_nop()
 	printf("\n");
 }
 
-void w3m_getsize(struct image *img, const char *file)
+void w3m_getsize(struct tty_t *tty, struct image *img, const char *file)
 {
+	int width, height;
 	logging(DEBUG, "w3m_getsize()\n");
 
 	if (get_current_frame(img)) { /* cleanup preloaded image */
@@ -185,8 +204,17 @@ void w3m_getsize(struct image *img, const char *file)
 	}
 
 	if (load_image(file, img)) {
-		printf("%d %d\n", get_image_width(img), get_image_height(img));
-		logging(DEBUG, "responce: %d %d\n", get_image_width(img), get_image_height(img));
+		/* XXX: we should consider cell alignment */
+		width = get_image_width(img);
+		height = get_image_height(img);
+
+		if ((width % tty->cell_width) != 0)
+			width  += tty->cell_width - (width % tty->cell_width);
+		if ((height % tty->cell_height) != 0)
+			height += tty->cell_height - (height % tty->cell_height);
+
+		printf("%d %d\n", width, height);
+		logging(DEBUG, "responce: %d %d\n", width, height);
 	} else {
 		printf("0 0\n");
 		logging(DEBUG, "responce: 0 0\n");
@@ -198,61 +226,11 @@ void w3m_clear(struct image img[], struct parm_t *parm)
 	logging(DEBUG, "w3m_clear()\n");
 
 	for (int i = 0; i < MAX_IMAGE; i++)
-		img[i].already_draw = false;
-	/*
-	int offset_x, offset_y, width, height;
-
-	if (parm->argc != 5)
-		return;
-
-	offset_x  = str2num(parm->argv[1]);
-	offset_y  = str2num(parm->argv[2]);
-	width     = str2num(parm->argv[3]);
-	height    = str2num(parm->argv[4]);
-
-	(void) offset_x;
-	(void) offset_y;
-	(void) width;
-	(void) height;
-	*/
+		img[i].already_drew = false;
 
 	(void) img;
 	(void) parm;
 }
-
-/*
-bool file_lock(FILE *fp)
-{
-	struct flock lock;
-
-	lock.l_type = F_WRLCK;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 0;
-	lock.l_len = 0;
-	lock.l_pid = getpid();
-
-	if (fcntl(fileno(fp), F_SETLKW, &lock) == -1)
-		return false;
-
-	return true;
-}
-
-bool file_unlock(FILE *fp)
-{
-	struct flock lock;
-
-	lock.l_type = F_UNLCK;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 0;
-	lock.l_len = 0;
-	lock.l_pid = getpid();
-
-	if (fcntl(fileno(fp), F_SETLK, &lock) == -1)
-		return false;
-
-	return true;
-}
-*/
 
 int check_fds(fd_set *fds, struct timeval *tv, int fd)
 {
@@ -301,10 +279,9 @@ bool terminal_query(int ttyfd, int *height, int *width, const char *send_seq, co
 	return false;
 }
 
-bool check_terminal_size(struct tty_t *tty)
+bool get_tty(struct tty_t *tty)
 {
 	char ttyname[L_ctermid];
-	struct winsize wsize;
 
 	/* get ttyname and open it */
 	if (!ctermid(ttyname)
@@ -313,6 +290,13 @@ bool check_terminal_size(struct tty_t *tty)
 		return false;
 	}
 	logging(DEBUG, "ttyname:%s fd:%d\n", ttyname, tty->fd);
+
+	return true;
+}
+
+bool check_terminal_size(struct tty_t *tty)
+{
+	struct winsize wsize;
 
 	/* at first, we try to get pixel size from "struct winsize" */
 	if (ioctl(tty->fd, TIOCGWINSZ, &wsize)) {
@@ -334,7 +318,7 @@ bool check_terminal_size(struct tty_t *tty)
 		CSI 18 t: request text area size in characters
 			-> responce: CSI 8 ; height ; width t
 	*/
-	/* this function causes I/O block...
+	/* this function causes I/O block... */
 	int cols, lines;
 	if (terminal_query(tty->fd, &tty->height, &tty->width, "\033[14t", "\033[4;%d;%dt")
 		&& terminal_query(tty->fd, &lines, &cols, "\033[18t", "\033[8;%d;%dt")) {
@@ -347,7 +331,6 @@ bool check_terminal_size(struct tty_t *tty)
 	} else {
 		logging(ERROR, "no responce for dtterm sequence\n");
 	}
-	*/
 
 	/* finally, use default value */
 	tty->width  = TERM_WIDTH;
@@ -398,14 +381,13 @@ int main(int argc, char *argv[])
 	*/
 	int i, op, optind;
 	char buf[BUFSIZE], *cp;
-	struct sixel_t sixel;
+	//struct sixel_t sixel;
 	struct tty_t tty;
 	struct image img[MAX_IMAGE];
 	struct parm_t parm;
 
 	if (freopen(instance_log, "a", stderr) == NULL)
 		logging(ERROR, "freopen (stderr to %s) faild\n", instance_log);
-	//file_lock(stderr);
 
 	logging(DEBUG, "--- new instance ---\n");
 	for (i = 0; i < argc; i++)
@@ -416,14 +398,24 @@ int main(int argc, char *argv[])
 	for (i = 0; i < MAX_IMAGE; i++)
 		init_image(&img[i]);
 
-	sixel.dither  = NULL;
-	sixel.context = NULL;
-
-	if (!check_terminal_size(&tty))
+	if (!get_tty(&tty))
 		goto release;
 
-	logging(DEBUG, "terminal size width:%d height:%d cell_width:%d cell_height:%d\n",
-		tty.width, tty.height, tty.cell_width, tty.cell_height);
+	/* XXX: when w3m uses pipe(), check_terminal_size() causes I/O block... */
+	if (argc >= 2) {
+		/* -test, -size: pipe() */
+		if (!check_terminal_size(&tty))
+			goto release;
+		logging(DEBUG, "terminal size width:%d height:%d cell_width:%d cell_height:%d\n",
+			tty.width, tty.height, tty.cell_width, tty.cell_height);
+	} else {
+		/* popen() */
+		/* check_terminal_size(&tty) causes I/O block... */
+		tty.width  = TERM_WIDTH;
+		tty.height = TERM_HEIGHT;
+		tty.cell_width  = CELL_WIDTH;
+		tty.cell_height = CELL_HEIGHT;
+	}
 
 	/* check args */
 	optind = 1;
@@ -434,7 +426,7 @@ int main(int argc, char *argv[])
 			goto release;
 		}
 		else if (strncmp(argv[optind], "-size", 5) == 0 && ++optind < argc) {
-			w3m_getsize(&img[0], argv[optind]);
+			w3m_getsize(&tty, &img[0], argv[optind]);
 			goto release;
 		}
 		optind++;
@@ -456,11 +448,8 @@ int main(int argc, char *argv[])
 			  v
 			  w3mimg_sixel.log (file lock)
 	*/
-	/*
 	if (freopen(log_file, "w", stderr) == NULL)
 		logging(ERROR, "freopen (stderr to %s) faild\n", log_file);
-	*/
-	//file_lock(stderr);
 
 	setvbuf(stderr, NULL, _IONBF, 0);
 	setvbuf(stdout, NULL, _IONBF, 0);
@@ -488,7 +477,7 @@ int main(int argc, char *argv[])
 		switch (op) {
 			case W3M_DRAW:
 			case W3M_REDRAW:
-				w3m_draw(&tty, &sixel, img, &parm, op);
+				w3m_draw(&tty, img, &parm, op);
 				break;
 			case W3M_STOP:
 				w3m_stop();
@@ -502,7 +491,7 @@ int main(int argc, char *argv[])
 			case W3M_GETSIZE:
 				if (parm.argc != 2) 
 					break;
-				w3m_getsize(&img[0], parm.argv[1]);
+				w3m_getsize(&tty, &img[0], parm.argv[1]);
 				break;
 			case W3M_CLEAR:
 				w3m_clear(img, &parm);
@@ -516,12 +505,10 @@ int main(int argc, char *argv[])
 release:
 	for (i = 0; i < MAX_IMAGE; i++)
 		free_image(&img[i]);
-	sixel_die(&sixel);
 
 	fflush(stdout);
 	fflush(stderr);
 
-	//file_unlock(stderr);
 	efclose(stderr);
 
 	if (tty.fd > 0)
