@@ -4,6 +4,11 @@
 enum {
 	SIXEL_COLORS = 256,
 	SIXEL_BPP    = 3,
+	/* screen escape sequence buffer: 512?
+		minus
+			"\033P"  at the beginning: 2
+			"\033\\" at the end      : 2 */
+	SCREEN_BUF_LIMIT = 508,
 };
 
 struct sixel_t {
@@ -14,13 +19,30 @@ struct sixel_t {
 int sixel_write_callback(char *data, int size, void *priv)
 {
 	struct tty_t *tty = (struct tty_t *) priv;
-	char *ptr;
+	char *ptr; //, buf[SCREEN_BUF_LIMIT + 4];
 	ssize_t wsize, left;
+
+	logging(DEBUG, "callback() data size:%d\n", size);
 
 	ptr  = data;
 	left = size;
+
 	while (ptr < (data + size)) {
-		wsize = ewrite(tty->fd, ptr, size);
+		/* penetrate
+		wsize = (left > SCREEN_BUF_LIMIT) ? SCREEN_BUF_LIMIT: left;
+
+		ewrite(tty->fd, "\033P", 2);
+		wsize = ewrite(tty->fd, ptr, wsize);
+		ewrite(tty->fd, "\033\\", 2);
+
+		logging(DEBUG, "left:%d wrote:%d\n", left, wsize);
+
+		ptr  += wsize;
+		left -= wsize;
+		*/
+		/*
+		*/
+		wsize = ewrite(tty->fd, ptr, left);
 		ptr  += wsize;
 		left -= wsize;
 	}
@@ -66,4 +88,20 @@ void sixel_die(struct sixel_t *sixel)
 
 	if (sixel->context)
 		sixel_output_unref(sixel->context);
+}
+
+void sixel_write(struct tty_t *tty, struct sixel_t *sixel, struct image *img)
+{
+	/* penetrate
+	//ewrite(tty->fd, "\0337", 2);
+	sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
+		get_image_channel(img), sixel->dither, sixel->context);
+	ewrite(tty->fd, "\033P\033\033\\\033P\\\033\\", 10);
+	//ewrite(tty->fd, "\0338", 2);
+	*/
+	/*
+	*/
+	(void) tty;
+	sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
+		get_image_channel(img), sixel->dither, sixel->context);
 }
