@@ -167,8 +167,7 @@ void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int o
 		/* sixel */
 		if (!sixel_init(&sixel, &new, tty))
 			goto sixel_init_err;
-		sixel_encode(get_current_frame(&new), get_image_width(&new), get_image_height(&new),
-			get_image_channel(&new), sixel.dither, sixel.context);
+		sixel_write(tty, &sixel, &new);
 		sixel_die(&sixel);
 
 sixel_init_err:
@@ -309,6 +308,7 @@ bool check_terminal_size(struct tty_t *tty)
 		tty->height = wsize.ws_ypixel;
 		tty->cell_width  = tty->width / wsize.ws_col;
 		tty->cell_height = tty->height / wsize.ws_row;
+		tty->height -= (tty->cell_height + 7);
 		logging(DEBUG, "terminal size set by winsize\n");
 		return true;
 	}
@@ -325,6 +325,7 @@ bool check_terminal_size(struct tty_t *tty)
 		&& terminal_query(tty->fd, &lines, &cols, "\033[18t", "\033[8;%d;%dt")) {
 		tty->cell_width  = tty->width / cols;
 		tty->cell_height = tty->height / lines;
+		tty->height -= (tty->cell_height + 7);
 		logging(DEBUG, "wsize.col:%d wsize.row:%d dtterm.col:%d dtterm.row:%d\n",
 			wsize.ws_col, wsize.ws_row, cols, lines);
 		logging(DEBUG, "terminal size set by dtterm sequence\n");
