@@ -28,23 +28,22 @@ int sixel_write_callback(char *data, int size, void *priv)
 	left = size;
 
 	while (ptr < (data + size)) {
-		/* penetrate
-		wsize = (left > SCREEN_BUF_LIMIT) ? SCREEN_BUF_LIMIT: left;
+		if (SIXEL_PENETRATE) {
+			wsize = (left > SCREEN_BUF_LIMIT) ? SCREEN_BUF_LIMIT: left;
 
-		ewrite(tty->fd, "\033P", 2);
-		wsize = ewrite(tty->fd, ptr, wsize);
-		ewrite(tty->fd, "\033\\", 2);
+			ewrite(tty->fd, "\033P", 2);
+			wsize = ewrite(tty->fd, ptr, wsize);
+			ewrite(tty->fd, "\033\\", 2);
 
-		logging(DEBUG, "left:%d wrote:%d\n", left, wsize);
+			logging(DEBUG, "left:%d wrote:%d\n", left, wsize);
 
-		ptr  += wsize;
-		left -= wsize;
-		*/
-		/*
-		*/
-		wsize = ewrite(tty->fd, ptr, left);
-		ptr  += wsize;
-		left -= wsize;
+			ptr  += wsize;
+			left -= wsize;
+		} else {
+			wsize = ewrite(tty->fd, ptr, left);
+			ptr  += wsize;
+			left -= wsize;
+		}
 	}
 
 	return true;
@@ -71,6 +70,7 @@ bool sixel_init(struct sixel_t *sixel, struct image *img, struct tty_t *tty)
 		return false;
 	}
 	sixel_dither_set_diffusion_type(sixel->dither, DIFFUSE_AUTO);
+	//sixel_dither_set_diffusion_type(sixel->dither, DIFFUSE_NONE);
 
 	if ((sixel->context = sixel_output_create(sixel_write_callback, (void *) tty)) == NULL) {
 		logging(ERROR, "couldn't create sixel context\n");
@@ -92,16 +92,14 @@ void sixel_die(struct sixel_t *sixel)
 
 void sixel_write(struct tty_t *tty, struct sixel_t *sixel, struct image *img)
 {
-	/* penetrate
-	//ewrite(tty->fd, "\0337", 2);
-	sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
-		get_image_channel(img), sixel->dither, sixel->context);
-	ewrite(tty->fd, "\033P\033\033\\\033P\\\033\\", 10);
-	//ewrite(tty->fd, "\0338", 2);
-	*/
-	/*
-	*/
-	(void) tty;
-	sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
-		get_image_channel(img), sixel->dither, sixel->context);
+	if (SIXEL_PENETRATE) {
+		ewrite(tty->fd, "\0337", 2);
+		sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
+			get_image_channel(img), sixel->dither, sixel->context);
+		ewrite(tty->fd, "\033P\033\033\\\033P\\\033\\", 10);
+		ewrite(tty->fd, "\0338", 2);
+	} else {
+		sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
+			get_image_channel(img), sixel->dither, sixel->context);
+	}
 }
