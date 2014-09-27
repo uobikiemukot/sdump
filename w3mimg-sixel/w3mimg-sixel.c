@@ -140,9 +140,13 @@ void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int o
 			return;
 		}
 		img->already_drew = false;
+	/* for ranger (python filer) */
+	//}
+	//if (!img->already_drew) { /* op == W3M_REDRAW */
 	} else if (!img->already_drew) { /* op == W3M_REDRAW */
+		char buf[BUFSIZE];
+		int size;
 		struct image new = *img;
-		long size;
 
 		size = get_image_width(img) * get_image_height(img) * get_image_channel(img);
 		if ((new.data[0] = ecalloc(size, 1)) == NULL)
@@ -151,7 +155,7 @@ void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int o
 		new.frame_count   = 1;
 		new.current_frame = 0;
 
-		/* XXX: maybe need to resize at this time */
+		/* XXX: at first, we need to resize, then crop */
 		if (width != get_image_width(&new) || height != get_image_height(&new))
 			resize_image(&new, width, height, false);
 
@@ -159,7 +163,6 @@ void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int o
 			(view_w ? view_w: width), (view_h ? view_h: height), false);
 
 		/* cursor move */
-		char buf[BUFSIZE];
 		snprintf(buf, BUFSIZE, "\033[%d;%dH",
 			(offset_y / tty->cell_height) + 1,( offset_x / tty->cell_width) + 1);
 		ewrite(tty->fd, buf, strlen(buf));
@@ -205,7 +208,7 @@ void w3m_getsize(struct tty_t *tty, struct image *img, const char *file)
 
 	if (load_image(file, img)) {
 		/* XXX: we should consider cell alignment */
-		width = get_image_width(img);
+		width  = get_image_width(img);
 		height = get_image_height(img);
 
 		if ((width % tty->cell_width) != 0)
@@ -230,6 +233,16 @@ void w3m_clear(struct image img[], struct parm_t *parm)
 
 	(void) img;
 	(void) parm;
+}
+
+void set_terminal_size(struct tty_t *tty, int width, int height, int cols, int lines)
+{
+	tty->cell_width  = (width / cols);
+	tty->cell_height = (height / lines);
+	tty->width  = width;
+	/* XXX: to avoid drawing at the bottom line,
+		shrink display height a little. +7 pixel is just for me */
+	tty->height = height - (tty->cell_height + 7);
 }
 
 int check_fds(fd_set *fds, struct timeval *tv, int fd)
@@ -296,6 +309,7 @@ bool get_tty(struct tty_t *tty)
 
 bool check_terminal_size(struct tty_t *tty)
 {
+	int width, height, cols, lines;
 	struct winsize wsize;
 
 	/* at first, we try to get pixel size from "struct winsize" */
@@ -304,11 +318,9 @@ bool check_terminal_size(struct tty_t *tty)
 	} else if (wsize.ws_xpixel == 0 || wsize.ws_ypixel == 0) {
 		logging(ERROR, "struct winsize has no pixel information\n");
 	} else {
-		tty->width  = wsize.ws_xpixel;
-		tty->height = wsize.ws_ypixel;
-		tty->cell_width  = tty->width / wsize.ws_col;
-		tty->cell_height = tty->height / wsize.ws_row;
-		tty->height -= (tty->cell_height + 7);
+		set_terminal_size(tty, wsize.ws_xpixel, wsize.ws_ypixel, wsize.ws_col, wsize.ws_row);
+		logging(DEBUG, "width:%d height%d cols:%d lines:%d\n",
+			wsize.ws_xpixel, wsize.ws_ypixel, wsize.ws_col, wsize.ws_row);
 		logging(DEBUG, "terminal size set by winsize\n");
 		return true;
 	}
@@ -320,14 +332,10 @@ bool check_terminal_size(struct tty_t *tty)
 			-> responce: CSI 8 ; height ; width t
 	*/
 	/* this function causes I/O block... */
-	int cols, lines;
-	if (terminal_query(tty->fd, &tty->height, &tty->width, "\033[14t", "\033[4;%d;%dt")
+	if (terminal_query(tty->fd, &height, &width, "\033[14t", "\033[4;%d;%dt")
 		&& terminal_query(tty->fd, &lines, &cols, "\033[18t", "\033[8;%d;%dt")) {
-		tty->cell_width  = tty->width / cols;
-		tty->cell_height = tty->height / lines;
-		tty->height -= (tty->cell_height + 7);
-		logging(DEBUG, "wsize.col:%d wsize.row:%d dtterm.col:%d dtterm.row:%d\n",
-			wsize.ws_col, wsize.ws_row, cols, lines);
+		set_terminal_size(tty, width, height, cols, lines);
+		logging(DEBUG, "width:%d height%d cols:%d lines:%d\n", width, height, cols, lines);
 		logging(DEBUG, "terminal size set by dtterm sequence\n");
 		return true;
 	} else {
@@ -335,14 +343,13 @@ bool check_terminal_size(struct tty_t *tty)
 	}
 
 	/* finally, use default value */
-	tty->width  = TERM_WIDTH;
-	tty->height = TERM_HEIGHT;
-	tty->cell_width  = CELL_WIDTH;
-	tty->cell_height = CELL_HEIGHT;
+	set_terminal_size(tty, TERM_WIDTH, TERM_HEIGHT,
+		TERM_WIDTH / CELL_WIDTH, TERM_HEIGHT / CELL_HEIGHT);
 	logging(DEBUG, "terminal size set by default value\n");
 
 	return true;
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -383,7 +390,6 @@ int main(int argc, char *argv[])
 	*/
 	int i, op, optind;
 	char buf[BUFSIZE], *cp;
-	//struct sixel_t sixel;
 	struct tty_t tty;
 	struct image img[MAX_IMAGE];
 	struct parm_t parm;
@@ -403,21 +409,18 @@ int main(int argc, char *argv[])
 	if (!get_tty(&tty))
 		goto release;
 
-	/* XXX: when w3m uses pipe(), check_terminal_size() causes I/O block... */
-	if (argc >= 2) {
-		/* -test, -size: pipe() */
+	/* FIXME: when w3m uses pipe(), read() in terminal_query() causes I/O block...
+		w3mimg [-test|-size] -> ok, not blocked
+		echo 0;1;4;92;183;64;0;0;183;64;/path/to/image.png | w3mimg -> blocked! */
+	if (QUERY_WINDOW_SIZE) {
 		if (!check_terminal_size(&tty))
 			goto release;
-		logging(DEBUG, "terminal size width:%d height:%d cell_width:%d cell_height:%d\n",
-			tty.width, tty.height, tty.cell_width, tty.cell_height);
 	} else {
-		/* popen() */
-		/* check_terminal_size(&tty) causes I/O block... */
-		tty.width  = TERM_WIDTH;
-		tty.height = TERM_HEIGHT;
-		tty.cell_width  = CELL_WIDTH;
-		tty.cell_height = CELL_HEIGHT;
+		set_terminal_size(&tty, TERM_WIDTH, TERM_HEIGHT,
+			TERM_WIDTH / CELL_WIDTH, TERM_HEIGHT / CELL_HEIGHT);
 	}
+	logging(DEBUG, "terminal size width:%d height:%d cell_width:%d cell_height:%d\n",
+		tty.width, tty.height, tty.cell_width, tty.cell_height);
 
 	/* check args */
 	optind = 1;
@@ -458,12 +461,8 @@ int main(int argc, char *argv[])
 
 	/* main loop */
     while (fgets(buf, BUFSIZE, stdin) != NULL) {
-		if ((cp = strchr(buf, '\n')) == NULL) {
-			logging(ERROR, "lbuf overflow? (couldn't find newline) buf length:%d\n", strlen(buf));
-			continue;
-		}
-		*cp = '\0';
-
+		if ((cp = strchr(buf, '\n')) != NULL)
+			*cp = '\0';
 		logging(DEBUG, "stdin: %s\n", buf);
 
 		reset_parm(&parm);
