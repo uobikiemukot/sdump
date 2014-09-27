@@ -235,6 +235,14 @@ void w3m_clear(struct image img[], struct parm_t *parm)
 	(void) parm;
 }
 
+void sig_handler(int signo)
+{
+	extern volatile sig_atomic_t window_resized; /* global */
+
+	if (signo == SIGWINCH)
+		window_resized = true;
+}
+
 void set_terminal_size(struct tty_t *tty, int width, int height, int cols, int lines)
 {
 	tty->cell_width  = (width / cols);
@@ -310,17 +318,17 @@ bool get_tty(struct tty_t *tty)
 bool check_terminal_size(struct tty_t *tty)
 {
 	int width, height, cols, lines;
-	struct winsize wsize;
+	struct winsize ws;
 
 	/* at first, we try to get pixel size from "struct winsize" */
-	if (ioctl(tty->fd, TIOCGWINSZ, &wsize)) {
+	if (ioctl(tty->fd, TIOCGWINSZ, &ws)) {
 		logging(ERROR, "ioctl: TIOCGWINSZ failed\n");
-	} else if (wsize.ws_xpixel == 0 || wsize.ws_ypixel == 0) {
+	} else if (ws.ws_xpixel == 0 || ws.ws_ypixel == 0) {
 		logging(ERROR, "struct winsize has no pixel information\n");
 	} else {
-		set_terminal_size(tty, wsize.ws_xpixel, wsize.ws_ypixel, wsize.ws_col, wsize.ws_row);
+		set_terminal_size(tty, ws.ws_xpixel, ws.ws_ypixel, ws.ws_col, ws.ws_row);
 		logging(DEBUG, "width:%d height%d cols:%d lines:%d\n",
-			wsize.ws_xpixel, wsize.ws_ypixel, wsize.ws_col, wsize.ws_row);
+			ws.ws_xpixel, ws.ws_ypixel, ws.ws_col, ws.ws_row);
 		logging(DEBUG, "terminal size set by winsize\n");
 		return true;
 	}
@@ -393,6 +401,7 @@ int main(int argc, char *argv[])
 	struct tty_t tty;
 	struct image img[MAX_IMAGE];
 	struct parm_t parm;
+	struct winsize ws;
 
 	if (freopen(instance_log, "a", stderr) == NULL)
 		logging(ERROR, "freopen (stderr to %s) faild\n", instance_log);
@@ -406,9 +415,16 @@ int main(int argc, char *argv[])
 	for (i = 0; i < MAX_IMAGE; i++)
 		init_image(&img[i]);
 
-	if (!get_tty(&tty))
-		goto release;
+	/* register signal handler for window resize event */
+	struct sigaction sigact = {
+		.sa_handler = sig_handler,
+		.sa_flags   = SA_RESTART,
+	};
+	esigaction(SIGWINCH, &sigact, NULL);
 
+	if (!get_tty(&tty))
+
+		goto release;
 	/* FIXME: when w3m uses pipe(), read() in terminal_query() causes I/O block...
 		w3mimg [-test|-size] -> ok, not blocked
 		echo 0;1;4;92;183;64;0;0;183;64;/path/to/image.png | w3mimg -> blocked! */
@@ -461,6 +477,18 @@ int main(int argc, char *argv[])
 
 	/* main loop */
     while (fgets(buf, BUFSIZE, stdin) != NULL) {
+		if (window_resized) {
+			window_resized = false;
+			if (ioctl(tty.fd, TIOCGWINSZ, &ws))
+				logging(WARN, "ioctl: TIOCGWINSZ failed\n");
+			else
+				set_terminal_size(&tty, CELL_WIDTH * ws.ws_col,
+					CELL_HEIGHT * ws.ws_row,ws.ws_col, ws.ws_row);
+			logging(DEBUG, "window resized!\n");
+			logging(DEBUG, "terminal size width:%d height:%d cell_width:%d cell_height:%d\n",
+				tty.width, tty.height, tty.cell_width, tty.cell_height);
+		}
+
 		if ((cp = strchr(buf, '\n')) != NULL)
 			*cp = '\0';
 		logging(DEBUG, "stdin: %s\n", buf);

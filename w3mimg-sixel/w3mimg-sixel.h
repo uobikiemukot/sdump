@@ -16,6 +16,9 @@
 #include <termios.h>
 #include <unistd.h>
 
+/* for Mac OS X? */
+#define SIGWINCH 28
+
 enum w3m_op {
 	W3M_DRAW = 0,
 	W3M_REDRAW,
