@@ -37,6 +37,7 @@ enum {
 	/* default value */
 	CELL_WIDTH         = 8,
 	CELL_HEIGHT        = 16,
+	/* this values will be updated at window resize */
 	TERM_WIDTH         = 1280,
 	TERM_HEIGHT        = 1024,
 	/* for select */
