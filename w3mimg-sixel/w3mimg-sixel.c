@@ -164,7 +164,7 @@ void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int o
 
 		/* cursor move */
 		snprintf(buf, BUFSIZE, "\033[%d;%dH",
-			(offset_y / tty->cell_height) + 1,( offset_x / tty->cell_width) + 1);
+			(offset_y / tty->cell_height) + 1, (offset_x / tty->cell_width) + 1);
 		ewrite(tty->fd, buf, strlen(buf));
 
 		/* sixel */
@@ -432,8 +432,14 @@ int main(int argc, char *argv[])
 		if (!check_terminal_size(&tty))
 			goto release;
 	} else {
-		set_terminal_size(&tty, TERM_WIDTH, TERM_HEIGHT,
-			TERM_WIDTH / CELL_WIDTH, TERM_HEIGHT / CELL_HEIGHT);
+		if (ioctl(tty.fd, TIOCGWINSZ, &ws)) {
+			logging(ERROR, "ioctl: TIOCGWINSZ failed\n");
+			set_terminal_size(&tty, TERM_WIDTH, TERM_HEIGHT,
+				CELL_WIDTH, CELL_HEIGHT);
+		} else {
+			set_terminal_size(&tty, CELL_WIDTH * ws.ws_col,
+				CELL_HEIGHT * ws.ws_row, ws.ws_col, ws.ws_row);
+		}
 	}
 	logging(DEBUG, "terminal size width:%d height:%d cell_width:%d cell_height:%d\n",
 		tty.width, tty.height, tty.cell_width, tty.cell_height);
@@ -479,11 +485,14 @@ int main(int argc, char *argv[])
     while (fgets(buf, BUFSIZE, stdin) != NULL) {
 		if (window_resized) {
 			window_resized = false;
-			if (ioctl(tty.fd, TIOCGWINSZ, &ws))
-				logging(WARN, "ioctl: TIOCGWINSZ failed\n");
-			else
+			if (ioctl(tty.fd, TIOCGWINSZ, &ws)) {
+				logging(ERROR, "ioctl: TIOCGWINSZ failed\n");
+				set_terminal_size(&tty, TERM_WIDTH, TERM_HEIGHT,
+					CELL_WIDTH, CELL_HEIGHT);
+			} else {
 				set_terminal_size(&tty, CELL_WIDTH * ws.ws_col,
-					CELL_HEIGHT * ws.ws_row,ws.ws_col, ws.ws_row);
+					CELL_HEIGHT * ws.ws_row, ws.ws_col, ws.ws_row);
+			}
 			logging(DEBUG, "window resized!\n");
 			logging(DEBUG, "terminal size width:%d height:%d cell_width:%d cell_height:%d\n",
 				tty.width, tty.height, tty.cell_width, tty.cell_height);

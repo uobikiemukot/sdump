@@ -31,7 +31,7 @@ enum w3m_op {
 };
 
 enum {
-	VERBOSE            = true,   /* if false, suppress "DEBUG" level logging */
+	VERBOSE            = false,   /* if false, suppress "DEBUG" level logging */
 	BUFSIZE            = 1024,
 	MAX_IMAGE          = 1024,
 	/* default value */
