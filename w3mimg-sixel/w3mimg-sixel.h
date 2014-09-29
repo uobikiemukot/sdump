@@ -31,7 +31,7 @@ enum w3m_op {
 };
 
 enum {
-	VERBOSE            = false,   /* if false, suppress "DEBUG" level logging */
+	VERBOSE            = false,  /* if false, suppress "DEBUG" level logging */
 	BUFSIZE            = 1024,
 	MAX_IMAGE          = 1024,
 	/* default value */
@@ -45,7 +45,7 @@ enum {
 	SELECT_CHECK_LIMIT = 4,
 	/* experimental features: buggy! */
 	QUERY_WINDOW_SIZE  = false,
-	SIXEL_PENETRATE    = false,
+	SIXEL_PENETRATE    = true,
 };
 
 struct tty_t {

@@ -8,7 +8,7 @@ LDFLAGS = -ljpeg -lpng -lsixel
 
 HDR = ../libnsgif.h ../libnsbmp.h \
 	../util.h ../loader.h ../image.h \
-	parsearg.h sixel.h
+	../sixel.h parsearg.h
 SRC = w3mimg-sixel.c ../libnsgif.c ../libnsbmp.c
 DST = w3mimg-sixel
 

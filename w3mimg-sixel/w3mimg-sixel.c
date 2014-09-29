@@ -3,8 +3,8 @@
 #include "../util.h"
 #include "../loader.h"
 #include "../image.h"
+#include "../sixel.h"
 #include "parsearg.h"
-#include "sixel.h"
 
 uint8_t *crop_image_single(struct tty_t *tty, struct image *img, uint8_t *data,
     int shift_x, int shift_y, int width, int height)
@@ -168,9 +168,9 @@ void w3m_draw(struct tty_t *tty, struct image imgs[], struct parm_t *parm, int o
 		ewrite(tty->fd, buf, strlen(buf));
 
 		/* sixel */
-		if (!sixel_init(&sixel, &new, tty))
+		if (!sixel_init(tty, &sixel, &new, SIXEL_PENETRATE))
 			goto sixel_init_err;
-		sixel_write(tty, &sixel, &new);
+		sixel_write(tty, &sixel, &new, SIXEL_PENETRATE);
 		sixel_die(&sixel);
 
 sixel_init_err:
