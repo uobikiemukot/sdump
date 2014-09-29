@@ -8,13 +8,13 @@ LDFLAGS = -ljpeg -lpng -lsixel
 
 HDR = ../libnsgif.h ../libnsbmp.h \
 	../util.h ../loader.h ../image.h \
-	parsearg.h sixel.h
-SRC = w3mimg-sixel.c ../libnsgif.c ../libnsbmp.c
-DST = w3mimg-sixel
+	../sixel.h parsearg.h
+SRC = yaimg-sixel.c ../libnsgif.c ../libnsbmp.c
+DST = yaimg-sixel
 
 all:  $(DST)
 
-w3mimg-sixel: $(SRC) $(HDR)
+yaimg-sixel: $(SRC) $(HDR)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(SRC) -o $@
 
 clean:
