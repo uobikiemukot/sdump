@@ -19,10 +19,17 @@
 #include <unistd.h>
 #include <sixel.h>
 
-/*
 enum {
-	VERBOSE   = false,
-	BUFSIZE   = 1024,
-	MULTIPLER = 1024,
+	VERBOSE     = false,
+	BUFSIZE     = 1024,
+	CELL_WIDTH  = 16,
+	CELL_HEIGHT = 8,
 };
-*/
+
+struct tty_t {
+	int fd;                      /* fd of current controlling terminal */
+	int width, height;           /* terminal size (by pixel) */
+	int cell_width, cell_height; /* cell_size (by pixel) */
+};
+
+char temp_file[PATH_MAX];
