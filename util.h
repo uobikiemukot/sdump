@@ -1,9 +1,5 @@
 /* See LICENSE for licence details. */
 /* error functions */
-enum {
-	VERBOSE = true, /* if false, suppress "DEBUG" level logging */
-};
-
 enum loglevel_t {
 	DEBUG = 0,
 	WARN,
@@ -156,41 +152,6 @@ int esigaction(int signo, struct sigaction *act, struct sigaction *oact)
 	return ret;
 }
 
-/*
-int estat(const char *restrict path, struct stat *restrict buf)
-{
-	int ret;
-	errno = 0;
-
-	if ((ret = stat(path, buf)) < 0)
-		logging(ERROR, "stat: %s\n", strerror(errno));
-
-	return ret;
-}
-
-void *emmap(void *addr, size_t len, int prot, int flag, int fd, off_t offset)
-{
-	uint32_t *fp;
-	errno = 0;
-
-	if ((fp = (uint32_t *) mmap(addr, len, prot, flag, fd, offset)) == MAP_FAILED)
-		logging(ERROR, "mmap: %s\n", strerror(errno));
-
-	return fp;
-}
-
-int emunmap(void *ptr, size_t len)
-{
-	int ret;
-	errno = 0;
-
-	if ((ret = munmap(ptr, len)) < 0)
-		logging(ERROR, "munmap: %s\n", strerror(errno));
-
-	return ret;
-}
-*/
-
 /* some useful functions */
 int str2num(char *str)
 {
@@ -199,31 +160,3 @@ int str2num(char *str)
 
 	return estrtol(str, NULL, 10);
 }
-
-/*
-static inline void swapint(int *a, int *b)
-{
-	int tmp = *a;
-	*a  = *b;
-	*b  = tmp;
-}
-
-static inline int my_ceil(int val, int div)
-{
-	return (val + div - 1) / div;
-}
-
-static inline uint32_t bit_reverse(uint32_t val, int bits)
-{
-	uint32_t ret = val;
-	int shift = bits - 1;
-
-	for (val >>= 1; val; val >>= 1) {
-		ret <<= 1;
-		ret |= val & 1;
-		shift--;
-	}
-
-	return ret <<= shift;
-}
-*/
