@@ -4,11 +4,6 @@
 enum {
 	SIXEL_COLORS = 256,
 	SIXEL_BPP    = 3,
-	/* screen escape sequence buffer: 512?
-		minus
-			"\033P"  at the beginning: 2
-			"\033\\" at the end      : 2 */
-	SCREEN_BUF_LIMIT = 508,
 };
 
 struct sixel_t {
@@ -19,7 +14,7 @@ struct sixel_t {
 int sixel_write_callback(char *data, int size, void *priv)
 {
 	struct tty_t *tty = (struct tty_t *) priv;
-	char *ptr; //, buf[SCREEN_BUF_LIMIT + 4];
+	char *ptr;
 	ssize_t wsize, left;
 
 	logging(DEBUG, "callback() data size:%d\n", size);
@@ -28,28 +23,15 @@ int sixel_write_callback(char *data, int size, void *priv)
 	left = size;
 
 	while (ptr < (data + size)) {
-		if (SIXEL_PENETRATE) {
-			wsize = (left > SCREEN_BUF_LIMIT) ? SCREEN_BUF_LIMIT: left;
-
-			ewrite(tty->fd, "\033P", 2);
-			wsize = ewrite(tty->fd, ptr, wsize);
-			ewrite(tty->fd, "\033\\", 2);
-
-			logging(DEBUG, "left:%d wrote:%d\n", left, wsize);
-
-			ptr  += wsize;
-			left -= wsize;
-		} else {
-			wsize = ewrite(tty->fd, ptr, left);
-			ptr  += wsize;
-			left -= wsize;
-		}
+		wsize = ewrite(tty->fd, ptr, left);
+		ptr  += wsize;
+		left -= wsize;
 	}
 
 	return true;
 }
 
-bool sixel_init(struct sixel_t *sixel, struct image *img, struct tty_t *tty)
+bool sixel_init(struct tty_t *tty, struct sixel_t *sixel, struct image *img)
 {
 	/* XXX: libsixel only allows 3 bytes per pixel image,
 		we should convert bpp when bpp is 1 or 2 or 4 */
@@ -92,14 +74,8 @@ void sixel_die(struct sixel_t *sixel)
 
 void sixel_write(struct tty_t *tty, struct sixel_t *sixel, struct image *img)
 {
-	if (SIXEL_PENETRATE) {
-		ewrite(tty->fd, "\0337", 2);
-		sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
-			get_image_channel(img), sixel->dither, sixel->context);
-		ewrite(tty->fd, "\033P\033\033\\\033P\\\033\\", 10);
-		ewrite(tty->fd, "\0338", 2);
-	} else {
-		sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
-			get_image_channel(img), sixel->dither, sixel->context);
-	}
+	(void) tty;
+
+	sixel_encode(get_current_frame(img), get_image_width(img), get_image_height(img),
+		get_image_channel(img), sixel->dither, sixel->context);
 }
