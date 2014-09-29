@@ -1,9 +1,5 @@
 /* See LICENSE for licence details. */
 /* error functions */
-enum {
-	VERBOSE = true, /* if false, suppress "DEBUG" level logging */
-};
-
 enum loglevel_t {
 	DEBUG = 0,
 	WARN,
