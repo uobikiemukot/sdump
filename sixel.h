@@ -22,7 +22,7 @@ int sixel_callback_penetrate(char *data, int size, void *priv)
 	char *ptr;
 	ssize_t wsize, left;
 
-	logging(DEBUG, "callback() data size:%d\n", size);
+	logging(DEBUG, "callback_penetrate() data size:%d\n", size);
 
 	ptr  = data;
 	left = size;
@@ -110,7 +110,7 @@ void normalize_bpp(struct image *img, int bytes_per_pixel, bool normalize_all)
 
 bool sixel_init(struct tty_t *tty, struct sixel_t *sixel, struct image *img, bool enable_penetrate)
 {
-	int (*sixel_callback)(char *data, int size, void *priv);
+	int (*callback_func)(char *data, int size, void *priv);
 
 	/* XXX: libsixel only allows 3 bytes per pixel image,
 		we should convert bpp when bpp is 1 or 2 or 4 */
@@ -132,12 +132,13 @@ bool sixel_init(struct tty_t *tty, struct sixel_t *sixel, struct image *img, boo
 	}
 	sixel_dither_set_diffusion_type(sixel->dither, DIFFUSE_AUTO);
 
-	sixel_callback = (enable_penetrate) ? sixel_callback_penetrate: sixel_callback;
-	if ((sixel->context = sixel_output_create(sixel_callback, (void *) tty)) == NULL) {
+	callback_func = (enable_penetrate) ? sixel_callback_penetrate: sixel_callback;
+	if ((sixel->context = sixel_output_create(callback_func, (void *) tty)) == NULL) {
 		logging(ERROR, "couldn't create sixel context\n");
 		return false;
 	}
-	sixel_output_set_skip_dcs_envelope(sixel->context, 1);
+	if (enable_penetrate)
+		sixel_output_set_skip_dcs_envelope(sixel->context, 1);
 	sixel_output_set_8bit_availability(sixel->context, CSIZE_7BIT);
 
 	return true;
