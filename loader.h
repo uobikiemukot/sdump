@@ -110,7 +110,7 @@ bool load_jpeg(FILE *fp, struct image *img)
 
 	/* disable colormap (indexed color), grayscale -> rgb */
 	cinfo.quantize_colors = FALSE;
-	cinfo.out_color_space = JCS_RGB;
+	//cinfo.out_color_space = JCS_RGB;
 	jpeg_start_decompress(&cinfo);
 
 	img->width   = cinfo.output_width;
@@ -184,10 +184,13 @@ bool load_png(FILE *fp, struct image *img)
 		-	1,2,4 bits per color -> 8 bits per color
 		-	grayscale -> rgb
 		-	perform set_expand() */
+	/*
 	png_read_png(png_ptr, info_ptr,
 		PNG_TRANSFORM_STRIP_ALPHA | PNG_TRANSFORM_STRIP_16 |
 		PNG_TRANSFORM_PACKING | PNG_TRANSFORM_GRAY_TO_RGB |
 		PNG_TRANSFORM_EXPAND, NULL);
+	*/
+	png_read_png(png_ptr, info_ptr, PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND, NULL);
 
 	img->width   = png_get_image_width(png_ptr, info_ptr);
 	img->height  = png_get_image_height(png_ptr, info_ptr);

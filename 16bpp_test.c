@@ -126,10 +126,23 @@ int main(int argc, char **argv)
 	/* init */
 	init_image(&img);
 
+	FILE *fp;
+	fp = efopen(file, "r");
+
+	img.width   = 12;
+	img.height  = 6;
+	img.alpha   = false;
+	img.channel = 2;
+	img.data[0] = ecalloc(img.width * img.height, 2);
+
+	fread(img.data[0], 1, img.width * img.height * 2, fp);
+
+	/*
 	if (load_image(file, &img) == false) {
 		logging(FATAL, "couldn't load image\n");
 		return EXIT_FAILURE;
 	}
+	*/
 
 	if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws)) {
 		logging(ERROR, "ioctl: TIOCGWINSZ failed\n");

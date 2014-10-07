@@ -18,10 +18,10 @@
 #include <signal.h>
 #include <termios.h>
 #include <unistd.h>
-#include <sixel.h>
+#include "sixel.h"
 
 enum {
-	VERBOSE   = false,
+	VERBOSE      = true,
 	CELL_WIDTH   = 8,
 	CELL_HEIGHT  = 16,
 	BUFSIZE      = 1024,
