@@ -397,7 +397,7 @@ error_analyse_failed:
 }
 
 /* pnm functions */
-inline int getint(FILE *fp)
+static inline int getint(FILE *fp)
 {
 	int c, n = 0;
 
@@ -412,7 +412,7 @@ inline int getint(FILE *fp)
 	return n;
 }
 
-inline uint8_t pnm_normalize(int c, int type, int max_value)
+static inline uint8_t pnm_normalize(int c, int type, int max_value)
 {
 	if (type == 1 || type == 4)
 		return (c == 0) ? 0: 0xFF;
