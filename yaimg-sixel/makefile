@@ -4,7 +4,7 @@ CC ?= gcc
 CFLAGS  ?= -Wall -Wextra -std=c99 -pedantic \
 -O3 -pipe -s
 #-Og -g -rdynamic #-pg
-LDFLAGS = -ljpeg -lpng -lsixel
+LDFLAGS ?= -ljpeg -lpng -lsixel
 
 HDR = ../libnsgif.h ../libnsbmp.h \
 	../util.h ../loader.h ../image.h \
