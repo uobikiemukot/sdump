@@ -1,12 +1,13 @@
 #CC ?= gcc
 CC ?= clang
 
-CFLAGS  = -Wall -Wextra -std=c99 -pedantic \
--g -Og -rdynamic -pipe \
+CFLAGS ?= -Wall -Wextra -std=c99 -pedantic \
+-g -rdynamic -pipe \
 -I./libsixel -I./libsixel/include
 #-march=native -Ofast -flto -pipe -s
 #-O3 -pipe -s 
 LDFLAGS = -ljpeg -lpng #-lsixel
+LIBSIXEL_CONFIG_H = libsixel/config.h
 
 HDR = stb_image.h libnsgif.h libnsbmp.h \
 	sdump.h util.h loader.h image.h sixel_util.h
@@ -22,15 +23,18 @@ DST = sdump
 
 all:  $(DST)
 
-sdump: $(SRC) $(HDR)
+$(LIBSIXEL_CONFIG_H):
+	cd libsixel && ./configure
+
+sdump: $(SRC) $(HDR) $(LIBSIXEL_CONFIG_H)
 	$(CC) -I./libsixel -I./libsixel/include \
-		-g -Og -rdynamic -c $(SIXEL_SRC)
+		-g -rdynamic -c $(SIXEL_SRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(SIXEL_OBJ) $(SRC) -o $@
 	rm -f *.o
 
-16bpp_test: 16bpp_test.c libnsgif.c libnsbmp.c $(HDR)
+16bpp_test: 16bpp_test.c libnsgif.c libnsbmp.c $(HDR) $(LIBSIXEL_CONFIG_H)
 	$(CC) -I./libsixel -I./libsixel/include \
-		-g -Og -rdynamic -c $(SIXEL_SRC)
+		-g -rdynamic -c $(SIXEL_SRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(SIXEL_OBJ) 16bpp_test.c libnsgif.c libnsbmp.c -o $@
 	rm -f *.o
 
