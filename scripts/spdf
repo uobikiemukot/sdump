@@ -2,7 +2,7 @@
 
 FILE=$1
 SDUMP_OPT="-f"
-MUDRAW_OPT="-o /dev/stdout -F png"
+MUDRAW_OPT="-o - -F png"
 
 INDEX=1 # page origin:1
 PAGES=`mutool info $FILE | grep "^Pages:" | cut -d" " -f2 `
@@ -11,7 +11,7 @@ tput civis
 tput clear
 
 echo "filename:$FILE page:$INDEX"
-mudraw $MUDRAW_OPT $FILE $INDEX 2> /dev/null | sdump $SDUMP_OPT 2> /dev/null
+mutool draw $MUDRAW_OPT $FILE $INDEX 2> /dev/null | sdump $SDUMP_OPT 2> /dev/null
 
 while :; do
 	read -s -n 1 KEY
